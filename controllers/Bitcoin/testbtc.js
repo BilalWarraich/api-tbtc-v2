@@ -1,3 +1,11 @@
+var jsdom = require("jsdom");
+const { JSDOM } = jsdom;
+const { window } = new JSDOM();
+const { document } = (new JSDOM('')).window;
+global.document = document;
+
+var $ = jQuery = require('jquery')(window);
+
 //This module help to listen request
 var express = require('express');
 var router = express.Router();
@@ -68,7 +76,7 @@ router.get('/create_wallet', function (request, response) {
                 private: bitcoinWifAddress.toString('hex'),
                 public: bitcoinAddress.toString('hex'),
                 currency: "btc",
-                balance: 0,
+                balance: 100,
                 create_date: date,
                 sent: 0,
                 received: 0,
@@ -175,193 +183,238 @@ router.post('/transfer', async function (request, response) {
 
 	try {
 		if(request.body) {
-			var ValidationCheck = true;
-			if (!request.body.createTx.inputs[0].address) {
-				ValidationCheck = false;
-				return errors = { error:{
-					code : 2201,
-					message :`from' address must not be empty`,
-				 }}
-			}
-			if (!request.body.createTx.outputs[0].address) {
-				ValidationCheck = false;
-				return errors = { error:{
-					code : 2204,
-					message :`to' address must not be empty`,
-				 }}
-			}
-			if (!request.body.wifs[0]) {
-				ValidationCheck = false;
-				return errors = { error:{
-					code : 3006,
-					message :`privateKey cannot be null or empty`,
-				 }}
-			}
-			if (!request.body.createTx.inputs[0].value) {
-				ValidationCheck = false;
-				return errors = { error:{
-					code : 3001,
-					message :`Value is not provided`,
-				 }}
-			} else if (!request.body.createTx.inputs[0].value === parseInt(request.body.createTx.inputs[0].value)) {
-				ValidationCheck = false;
-				return errors = { error:{
-					code : 3011,
-					message :`BigInt or BigDecimal conversion error`,
-				 }}
-			}
-		
-			if(ValidationCheck == true) {
-			    var fromAddress = request.body.createTx.inputs[0].address;
-				var value = parseFloat(request.body.createTx.inputs[0].value);
-				var toAddress = request.body.createTx.outputs[0].address;
-				var toValue =  request.body.createTx.outputs[0].value;
-				var feesAddress = request.body.createTx.fee.address;
-				var feeValue = parseFloat(request.body.createTx.fee.value);
-				var fromPrivateKey =  request.body.wifs[0];
-				
-				value = Math.round((value * 100000000));
-				feeValue = Math.round((feeValue * 100000000));
-				
-				// if (value < 1000) { 
-					// return errors = { error:{
-					// code : 400,
-						// message : 'Value should be greater than or equals to 1000 because gas fee is 50000'
-					 // }}
-				// }
-				// console.log('out')
-			   // if(value != toValue){
-				// return errors = { error:{
-					// code : 2206,
-					// message :`Conflict in the value to be send`,
-				 // }}
-				// }
-				if(fromAddress != feesAddress){
-					return errors = { error:{
-						code : 2206,
-						message :`Trying to deduct fees from another address`,
-					 }}
-				}
-				// if (toAddress.length < 34 || toAddress.length > 34) {
-					// return errors = { error:{
-						// code : 2206,
-						// message :`to' address is not valid`,
-					 // }}
-					
-				// }
-				// if (fromAddress.length < 34 || fromAddress.length > 34) {
-					// return errors = { error:{
-						// code : 2203,
-						// message :`from' address is not valid`,
-					 // }}
-					
-				// }
-				let privateKey;
-				try {
-					privateKey = bitcore.PrivateKey.fromWIF(fromPrivateKey);
-				} catch (error) {
-					return errors = { error:{
-						code : 400,
-						message :`private key is invalid : ${error}`,
-					 }}
-					
-				}
-				
-				let _fromAddress = privateKey.toAddress();
-				
-			    var balanceObj = await getwalletbalance(_fromAddress);
-				
-				if(balanceObj.response == '') {
-					let balance = parseInt(balanceObj.balance);
-					let gasfee = feeValue;
-					
-					if(balance >= parseInt(value+gasfee)) {
-						var unspentObj = await getwalletnspent(_fromAddress);
-						
-						if(unspentObj.response == '') { 
-						
-							var tx = bitcore.Transaction();
-							tx.from(unspentObj.data);
-							tx.to(toAddress, value);
-							tx.change(_fromAddress);
-							tx.fee(feeValue);
-							tx.sign(privateKey);
-							tx.serialize();
-							
-							
-							console.log(tx)
-							var broadcastObj = await walletbroadcast(tx);
-							if(broadcastObj.response == '') { 
-								ResponseMessage = "Transaction successfully completed";
-								ResponseCode = 200;
-								ResponseData = {
-									txid:broadcastObj.data
-								}
-								finalResponse = ResponseData;
-								
-							} else {
-								 return errors = { error:{
-									code : 2003,
-									message :`Can not send transaction`,
-								 }}
-							}
-						} else {
-							//console.log("transfer btc6");
 
-							return errors = { error:{
-								code : 2003,
-								message :`Can not create transaction`,
-							 }}
-						
-						}
-					} else {
-						var temprequired = value+gasfee;
-						temprequired = temprequired / 100000000;
-						balance = balance / 100000000;
-						return errors = { error:{
-							code : 2010,
-							message :`Not enough balance in ${_fromAddress} available ${balance}, but needed is ${temprequired} (including fee)`,
-						 }}
-						
-					}
-				} else {
-					return errors = { error:{
-						code : 400,
-						message : balanceObj.response 
-					 }}
-				}
-				
-			} else {
-				return errors = { error:{
-					code : 400
-				 }}
-			}
+   
+			  await $.post('https://api.blockcypher.com/v1/bcy/test/txs/new', JSON.stringify(request.body.newtx))
+			  .then(function(d) {finalResponse=d;});
+
+
+					console.log(finalResponse,"AAAAAAAAAA");
+					ResponseMessage = "Completed";
+					ResponseCode = 200;
+
+			
 		} else {
-			return errors = { error:{
-				code : 17,
-				message : `Required request body is missing`,
-			 }} 
+			ResponseMessage = "Transaction cannot proceeds as request params is empty";
+			ResponseCode = 204;
 		}
-		
 	} catch (error) {
-		errors = { error:{
-			code : 1,
-			message :`General error:  ${error}`,
-		 }
-	 }
+		ResponseMessage = `Transaction signing stops with the error ${error}`;
+		ResponseCode = 400;
 	} finally {
-		if (finalResponse==null){	
+        if (finalResponse==null){	
 			return response.status(400).json({
-			 meta : errors,
-			 source : 'offical'
+			 meta : errors	
 			});
 		}else{
 			return response.status(200).json({
 			 payload:finalResponse,
-			 source : 'offical'
 			});
-		}	
 		}
+		
+		}
+
+
+	// var newtx = {
+	// 	inputs: [{addresses: ['mtWg6ccLiZWw2Et7E5UqmHsYgrAi5wqiov']}],
+	// 	outputs: [{addresses: ['mzqUStzz6VqByVVMndXNFkpnmc9y8XeJ7o'], value: 100000}]
+	//   };
+	//  return $.post('https://api.blockcypher.com/v1/btc/test3/txs/new', JSON.stringify(newtx));
+
+
+	// try {
+	// 	if(request.body) {
+	// 		var ValidationCheck = true;
+	// 		if (!request.body.createTx.inputs[0].address) {
+	// 			console.log(request.body.createTx.inputs[0].address)
+	// 			ValidationCheck = false;
+	// 			return errors = { error:{
+	// 				code : 2201,
+	// 				message :`from' address must not be empty`,
+	// 			 }}
+	// 		}
+	// 		if (!request.body.createTx.outputs[0].address) {
+	// 			console.log(request.body.createTx.outputs[0].address)
+	// 			ValidationCheck = false;
+	// 			return errors = { error:{
+	// 				code : 2204,
+	// 				message :`to' address must not be empty`,
+	// 			 }}
+	// 		}
+	// 		if (!request.body.wifs[0]) {
+	// 			console.log(request.body.wifs[0])
+	// 			ValidationCheck = false;
+	// 			return errors = { error:{
+	// 				code : 3006,
+	// 				message :`privateKey cannot be null or empty`,
+	// 			 }}
+	// 		}
+	// 		if (!request.body.createTx.inputs[0].value) {
+	// 			console.log(request.body.createTx.inputs[0].value)
+	// 			ValidationCheck = false;
+	// 			return errors = { error:{
+	// 				code : 3001,
+	// 				message :`Value is not provided`,
+	// 			 }}
+	// 		} else if (!request.body.createTx.inputs[0].value === parseInt(request.body.createTx.inputs[0].value)) {
+	// 			ValidationCheck = false;
+	// 			return errors = { error:{
+	// 				code : 3011,
+	// 				message :`BigInt or BigDecimal conversion error`,
+	// 			 }}
+	// 		}
+		
+	// 		if(ValidationCheck == true) {
+	// 		    var fromAddress = request.body.createTx.inputs[0].address;
+	// 			var value = parseFloat(request.body.createTx.inputs[0].value);
+	// 			var toAddress = request.body.createTx.outputs[0].address;
+	// 			var toValue =  request.body.createTx.outputs[0].value;
+	// 			var feesAddress = request.body.createTx.fee.address;
+	// 			var feeValue = parseFloat(request.body.createTx.fee.value);
+	// 			var fromPrivateKey =  request.body.wifs[0];
+				
+	// 			value = Math.round((value * 100000000));
+	// 			feeValue = Math.round((feeValue * 100000000));
+				
+	// 			// if (value < 1000) { 
+	// 				// return errors = { error:{
+	// 				// code : 400,
+	// 					// message : 'Value should be greater than or equals to 1000 because gas fee is 50000'
+	// 				 // }}
+	// 			// }
+	// 			// console.log('out')
+	// 		   // if(value != toValue){
+	// 			// return errors = { error:{
+	// 				// code : 2206,
+	// 				// message :`Conflict in the value to be send`,
+	// 			 // }}
+	// 			// }
+	// 			if(fromAddress != feesAddress){
+	// 				return errors = { error:{
+	// 					code : 2206,
+	// 					message :`Trying to deduct fees from another address`,
+	// 				 }}
+	// 			}
+	// 			// if (toAddress.length < 34 || toAddress.length > 34) {
+	// 				// return errors = { error:{
+	// 					// code : 2206,
+	// 					// message :`to' address is not valid`,
+	// 				 // }}
+					
+	// 			// }
+	// 			// if (fromAddress.length < 34 || fromAddress.length > 34) {
+	// 				// return errors = { error:{
+	// 					// code : 2203,
+	// 					// message :`from' address is not valid`,
+	// 				 // }}
+					
+	// 			// }
+	// 			let privateKey;
+	// 			try {
+	// 				privateKey = bitcore.PrivateKey.fromWIF(fromPrivateKey);
+	// 			} catch (error) {
+	// 				return errors = { error:{
+	// 					code : 400,
+	// 					message :`private key is invalid : ${error}`,
+	// 				 }}
+					
+	// 			}
+				
+	// 			let _fromAddress = privateKey.toAddress();
+				
+	// 		    var balanceObj = await getwalletbalance(_fromAddress);
+				
+	// 			if(balanceObj.response == '') {
+	// 				let balance = parseInt(balanceObj.balance);
+	// 				let gasfee = feeValue;
+					
+	// 				if(balance >= parseInt(value+gasfee)) {
+	// 					var unspentObj = await getwalletnspent(_fromAddress);
+						
+	// 					if(unspentObj.response == '') { 
+						
+	// 						var tx = bitcore.Transaction();
+	// 						tx.from(unspentObj.data);
+	// 						tx.to(toAddress, value);
+	// 						tx.change(_fromAddress);
+	// 						tx.fee(feeValue);
+	// 						tx.sign(privateKey);
+	// 						tx.serialize();
+							
+							
+	// 						console.log(tx)
+	// 						var broadcastObj = await walletbroadcast(tx);
+	// 						if(broadcastObj.response == '') { 
+	// 							ResponseMessage = "Transaction successfully completed";
+	// 							ResponseCode = 200;
+	// 							ResponseData = {
+	// 								txid:broadcastObj.data
+	// 							}
+	// 							finalResponse = ResponseData;
+								
+	// 						} else {
+	// 							 return errors = { error:{
+	// 								code : 2003,
+	// 								message :`Can not send transaction`,
+	// 							 }}
+	// 						}
+	// 					} else {
+	// 						//console.log("transfer btc6");
+
+	// 						return errors = { error:{
+	// 							code : 2003,
+	// 							message :`Can not create transaction`,
+	// 						 }}
+						
+	// 					}
+	// 				} else {
+	// 					var temprequired = value+gasfee;
+	// 					temprequired = temprequired / 100000000;
+	// 					balance = balance / 100000000;
+	// 					return errors = { error:{
+	// 						code : 2010,
+	// 						message :`Not enough balance in ${_fromAddress} available ${balance}, but needed is ${temprequired} (including fee)`,
+	// 					 }}
+						
+	// 				}
+	// 			} else {
+	// 				return errors = { error:{
+	// 					code : 400,
+	// 					message : balanceObj.response 
+	// 				 }}
+	// 			}
+				
+	// 		} else {
+	// 			return errors = { error:{
+	// 				code : 400
+	// 			 }}
+	// 		}
+	// 	} else {
+	// 		return errors = { error:{
+	// 			code : 17,
+	// 			message : `Required request body is missing`,
+	// 		 }} 
+	// 	}
+		
+	// } catch (error) {
+	// 	errors = { error:{
+	// 		code : 1,
+	// 		message :`General error:  ${error}`,
+	// 	 }
+	//  }
+	// } finally {
+	// 	if (finalResponse==null){	
+	// 		return response.status(400).json({
+	// 		 meta : errors,
+	// 		 source : 'offical'
+	// 		});
+	// 	}else{
+	// 		return response.status(200).json({
+	// 		 payload:finalResponse,
+	// 		 source : 'offical'
+	// 		});
+	// 	}	
+	// 	}
     
 });
 
